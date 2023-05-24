@@ -1,5 +1,8 @@
 package me.Goldensang;
 
+import me.Goldensang.gameobject.Bird;
+import me.Goldensang.gameobject.Pipe;
+
 import java.awt.Rectangle;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -12,7 +15,7 @@ public class NeuralNetwork {
 		return x / eps;
 	}
 	
-	private Rectangle bird;
+	private Bird bird;
 	private Pipe closest;
 	private Vector<Vector<Integer>> v;
 	double output[] = new double[30];
@@ -31,25 +34,31 @@ public class NeuralNetwork {
 				if(i != j) weight[i][j] = 0;
 	}
 	
-	public NeuralNetwork(Rectangle b, boolean first) {
+	public NeuralNetwork(Bird b, boolean first) {
 		this.bird = b;
 		v = new Vector<Vector<Integer>>();
 		if(first) def();
 		this.mutateweight();
 		
 	}
+
 	public void push_input() {
-		input[1] = bird.y - closest.p1upy + closest.p1h;
-		input[2] = closest.p2downy - bird.y - bird.height;
-		input[3] = closest.p1upx - bird.x;
-		input[4] = closest.p1upx + closest.w - bird.x;
-		input[5] = closest.p1upx - bird.x - bird.width;
-		input[6] = closest.p1upx + closest.w - bird.x;
+		int birdYCords = this.bird.getBird().y;
+		int birdXCords = this.bird.getBird().x;
+		int birdWidth = this.bird.getBird().width;
+		int birdHeight = this.bird.getBird().height;
+
+		input[1] = birdYCords - closest.p1upy + closest.p1h;
+		input[2] = closest.p2downy - birdYCords - birdHeight;
+		input[3] = closest.p1upx - birdXCords;
+		input[4] = closest.p1upx + closest.w - birdXCords;
+		input[5] = closest.p1upx - birdXCords - birdWidth;
+		input[6] = closest.p1upx + closest.w - birdXCords;
 		input[7] = velo;
 		input[8] = normalized(10);
 	}
 	
-	public void update(Rectangle b, Pipe p,int velo) {
+	public void update(Bird b, Pipe p,int velo) {
 		this.bird = b;
 		this.closest = p;
 		this.velo = velo;
