@@ -33,7 +33,6 @@ public class GameLogic implements ActionListener {
         if (GameState.checkForStopState()) {
             GameState.proceedStopState();
         }
-
         GameState.iterate();
     }
 }

@@ -1,19 +1,22 @@
 package me.Goldensang.gamelogic;
 
+import javafx.util.Pair;
 import me.Goldensang.FComp;
+import me.Goldensang.NeuralNetwork;
 import me.Goldensang.gameobject.Bird;
 import me.Goldensang.gameobject.Pipe;
 
 import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.stream.Collectors;
 
 public class GameState {
     private final static int screenWidth = 800;
     private final static int screenHeight = 800;
-    private final static int gameTick = 3;
+    private final static int gameTick = 10;
     private final static int maxGravityScaleOnBird = 15;
     private final static int birdFixLocation = 300;
     private final static int locationEpsilonForBirdToEarnScore = 6;
@@ -21,8 +24,9 @@ public class GameState {
     private final static int pipeSpeed = 10;
     private static final int gravityIncrementPerOddTick = 2;
     private static int tickCount;
+    private static int generation = 1;
     private static ArrayList<Pipe> pipes;
-
+    private static int totalPipeCount = 0;
     private static HashMap<Bird, ArrayList<Integer> > birdPipeScoreMapper;
     private static ArrayList<Bird> birds;
 
@@ -30,42 +34,61 @@ public class GameState {
 
     private static Rectangle background;
     private static Rectangle dirt;
-
     private static Timer timer;
 
-    public static void initialize() {
+    private static NeuralNetManager neuralNetManager = NeuralNetManager.getInstance();
+
+
+
+    public static void initialize(boolean first) {
         pipes = new ArrayList<>();
-        birds = new ArrayList<>();
         birdPipeScoreMapper = new HashMap<>();
 
-        // Load images & default settings for JFrames
-        mainFrame = new JFrame();
-        mainFrame.add(new FComp());
-        mainFrame.setVisible(true);
-        mainFrame.setSize(screenWidth, screenHeight);
-        mainFrame.setResizable(false);
+        if (first) {
 
-        // Initialize backgrounds objects (dirts, backgrounds, ...)
-        background = new Rectangle(0, 0, screenWidth, screenHeight);
-        dirt = new Rectangle(0, 650, screenWidth, 150);
+            birds = new ArrayList<>();
+            // Load images & default settings for JFrames
+            mainFrame = new JFrame();
+            mainFrame.add(new FComp());
+            mainFrame.setVisible(true);
+            mainFrame.setSize(screenWidth, screenHeight);
+            mainFrame.setResizable(false);
+
+            // Initialize backgrounds objects (dirts, backgrounds, ...)
+            background = new Rectangle(0, 0, screenWidth, screenHeight);
+            dirt = new Rectangle(0, 650, screenWidth, 150);
+            neuralNetManager.initialize();
+            neuralNetManager.generateNewBirdAndNeuralNet();
+
+
+        } else {
+            neuralNetManager.storeBestIterationNeuralNet();
+            neuralNetManager.learnAndIterateToNextStage();
+            generation++;
+        }
+
+        // Initialize initial pipe
+        addNewPipe(4);
 
         timer = new Timer(gameTick, new GameLogic());
         timer.start();
+
     }
 
     public static boolean checkForStopState() {
-        return birds.stream().anyMatch(bird -> bird.isAlive());
+        return !birds.stream().anyMatch(bird -> bird.isAlive());
     }
 
     public static void proceedStopState() {
         timer.stop();
+        initialize(false);
         // Add Neural Net logic here
     }
 
     public static void updateBirdGravity() {
         birds.forEach(bird -> {
             if (bird.isAlive())
-                bird.increaseYPosition(Math.max(maxBirdGravityNegativeScale , bird.getGravityScale()));
+                bird.increaseYPosition(Math.max(-maxBirdGravityNegativeScale , bird.getGravityScale()));
         });
     }
     public static boolean isIntersect(Pipe pipe, Bird bird) {
@@ -81,6 +104,7 @@ public class GameState {
     }
     public static void updateBirdScoreWhenIntersect(Bird bird, Pipe pipe) {
         if (isIntersect(pipe, bird)) {
+            bird.setAlive(false);
             return;
         }
 
@@ -90,10 +114,10 @@ public class GameState {
         if (birdXCords + birdWidth - locationEpsilonForBirdToEarnScore < pipe.p1upx || birdXCords + birdWidth > pipe.p1upx + pipe.w) {
             return;
         }
-        if (birdPipeScoreMapper.get(bird).contains(pipe.id)) {
+
+        if ((birdPipeScoreMapper.get(bird) != null) && birdPipeScoreMapper.get(bird).contains(pipe.id)) {
             return;
         }
-
         bird.setScore(bird.getScore() + 1);
 
         if (!birdPipeScoreMapper.containsKey(bird)) {
@@ -114,14 +138,32 @@ public class GameState {
     }
 
     public static void removeDeadPipe() {
-        pipes = pipes.stream().filter(pipe -> pipe.p1upx + pipe.w >= 0).collect(Collectors.toCollection(ArrayList::new));
+        ArrayList<Pipe> filteredPipes =  pipes.stream().filter(pipe -> pipe.p1upx + pipe.w >= 0).collect(Collectors.toCollection(ArrayList::new));
+        if (filteredPipes.size() != pipes.size()) {
+            pipes = filteredPipes;
+            addNewPipe(1);
+        }else
+            pipes = filteredPipes;
     }
     public static void updatePipeForNewIteration() {
         pipes.forEach(pipe -> pipe.transLeft(pipeSpeed));
     }
+
+    public static void execJumpActionOnBird(Bird b) {
+        int gravity = b.getGravityScale();
+        if (gravity > 0) {
+            gravity = 0;
+        }
+        gravity = Math.max(-10, gravity - 10);
+        b.setGravityScale(gravity);
+        b.decreaseYPosition(30);
+    }
     public static void updateNeuralNetworkWithNewPipeData(Pipe newPipeData) {
         birds.forEach(bird -> {
             bird.getBirdNeuralNetwork().update(bird, newPipeData, bird.getGravityScale());
+            if (bird.getNeuralNetwork().jumpornot()) {
+                execJumpActionOnBird(bird);
+            }
         });
     }
 
@@ -150,7 +192,26 @@ public class GameState {
         tickCount = tickCount + 1;
     }
 
+    public static void addNewPipe(int count) {
+        if (count == 0) return;
+        int randomHeightCount = (int) (Math.random() * 300.0) + 1;
+
+        increasePipeCount();
+
+        if (pipes.isEmpty()) {
+            pipes.add(new Pipe(800, 100 + randomHeightCount, 800 - 150, 100, totalPipeCount));
+        } else {
+            Pipe last = pipes.stream().skip(pipes.size() - 1).findFirst().get();
+            pipes.add(new Pipe(last.p1upx + 400, 100 + randomHeightCount, 800 - 150, 100, totalPipeCount));
+        }
+        addNewPipe(count - 1);
+    }
+
     // Auto generated function
+    public static void increasePipeCount() {
+        totalPipeCount++;
+    }
+
     public static Rectangle getBackground() {
         return background;
     }
@@ -179,6 +240,9 @@ public class GameState {
         return pipes;
     }
 
+    public static int getGeneration() {
+        return generation;
+    }
     public static void setPipes(ArrayList<Pipe> pipes) {
         GameState.pipes = pipes;
     }
@@ -201,5 +265,9 @@ public class GameState {
 
     public static void iterate() {
         mainFrame.repaint();
+    }
+
+    public static int getBestScore() {
+       return birds.stream().filter(Bird::isAlive).sorted(Comparator.comparing(Bird::getScore)).findFirst().get().getScore();
     }
 }

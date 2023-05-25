@@ -14,7 +14,7 @@ public class NeuralNetwork {
 	public static double normalized(double x) {
 		return x / eps;
 	}
-	
+
 	private Bird bird;
 	private Pipe closest;
 	private Vector<Vector<Integer>> v;
@@ -126,5 +126,13 @@ public class NeuralNetwork {
 			System.out.println();
 		}
 		
+	}
+
+	public Bird getBird() {
+		return bird;
+	}
+
+	public void setBird(Bird bird) {
+		this.bird = bird;
 	}
 }

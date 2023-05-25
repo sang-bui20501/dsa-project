@@ -6,6 +6,7 @@ import java.awt.*;
 
 public class Bird {
     private int gravityScale;
+
     private Rectangle bird;
 
     private NeuralNetwork neuralNetwork;
@@ -17,16 +18,24 @@ public class Bird {
     private int timeAlive;
 
     private boolean isAlive;
-    public Bird(Rectangle bird, int score) {
-        this.isAlive = true;
-        this.bird = bird;
-        this.score = score;
+    public Bird() {
+        this.bird = new Rectangle(300, 300, 50, 40);;
+
+        this.gravityScale = 0;
+        this.score = 0;
         this.timeAlive = 0;
+        this.isAlive = true;
 
         this.neuralNetwork = new NeuralNetwork(this, true);
     }
 
+    public NeuralNetwork getNeuralNetwork() {
+        return neuralNetwork;
+    }
 
+    public void setNeuralNetwork(NeuralNetwork neuralNetwork) {
+        this.neuralNetwork = neuralNetwork;
+    }
     public void increaseYPosition(int value) {
         this.bird.y += value;
     }
